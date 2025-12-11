@@ -1,145 +1,189 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="tr">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Face Meme iOS</title>
-
-<script defer src="https://unpkg.com/face-api.js"></script>
-
+  <title>Yüz İfadesine Göre Meme Gösterici</title>
   <style>
-    html, body {
-      margin:0; padding:0;
-      background:#000;
-      height:100%;
-    }
-    .wrap {
-      display:flex;
-      flex-direction:column;
-      height:100vh;
-    }
-    #videoArea, #memeArea {
-      flex:1;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      overflow:hidden;
-    }
-    #video {
-      width:100%;
-      height:100%;
-      object-fit:cover;
-      transform:scaleX(-1);
-      background:#111;
-    }
-    #memeImg {
-      max-width:100%;
-      max-height:100%;
-    }
-    #startBtn {
-      position:absolute;
-      top:50%; left:50%;
-      transform:translate(-50%, -50%);
-      padding:16px 28px;
-      background:#fff;
-      color:#000;
-      font-size:18px;
-      border-radius:12px;
-      z-index:999;
-    }
-    #msg {
-      position:absolute;
-      top:10px;
-      left:10px;
-      color:#fff;
+    html,body{height:100%;margin:0;font-family:Inter, system-ui, sans-serif;background:#111;color:#eee}
+    .split{display:flex;height:100vh;width:100vw}
+    .pane{flex:1;position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center}
+    .left{background:linear-gradient(180deg,#0b1220,#0f1724)}
+    .right{background:#0b0b0b}
+
+    video#webcam{max-width:100%;height:100%;object-fit:cover;transform:scaleX(-1)}
+    canvas#overlay{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none}
+
+    .photo-box{position:relative;width:80%;max-width:720px;height:80%;display:flex;align-items:center;justify-content:center}
+    .photo-box img{max-width:100%;max-height:100%;opacity:0;transition:opacity 300ms ease,transform 300ms ease;transform:scale(0.98)}
+    .photo-box img.show{opacity:1;transform:scale(1)}
+
+    .controls{position:absolute;left:12px;top:12px;background:rgba(0,0,0,0.35);padding:10px;border-radius:10px;backdrop-filter:blur(4px)}
+    .controls button{background:#1f2937;color:#fff;border:0;padding:8px 10px;border-radius:8px;cursor:pointer}
+    .status{position:absolute;right:12px;bottom:12px;background:rgba(0,0,0,0.35);padding:8px 10px;border-radius:8px}
+
+    @media(max-width:700px){
+      .split{flex-direction:column}
+      video#webcam{transform:none}
     }
   </style>
 </head>
-
 <body>
+  <div class="split">
+    <div class="pane left">
+      <div class="controls">
+        <button id="startBtn">Kamerayı Başlat</button>
+      </div>
+      <video id="webcam" autoplay muted playsinline></video>
+      <canvas id="overlay"></canvas>
+    </div>
 
-<button id="startBtn">Kamerayı Başlat</button>
-
-<div class="wrap">
-  <div id="videoArea">
-    <video id="video" autoplay muted playsinline></video>
-    <div id="msg"></div>
+    <div class="pane right">
+      <div class="photo-box">
+        <!-- Aşağıdaki resimler proje klasöründe bulunmalı: meme-happy.png, meme-shocked.png, meme-surprised.png, meme-thinking.png -->
+        <img id="img-happy" src="meme-happy.png" alt="happy">
+        <img id="img-shocked" src="meme-shocked.png" alt="shocked">
+        <img id="img-surprised" src="meme-surprised.png" alt="surprised">
+        <img id="img-thinking" src="meme-thinking.png" alt="thinking">
+      </div>
+      <div class="status" id="status">Durum: Bekleniyor</div>
+    </div>
   </div>
-  <div id="memeArea">
-    <img id="memeImg" src="">
-  </div>
-</div>
 
-<script>
-const startBtn = document.getElementById("startBtn");
-const video = document.getElementById("video");
-const memeImg = document.getElementById("memeImg");
-const msg = document.getElementById("msg");
+  <!-- face-api.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+  <script>
+    // Bu proje için face-api model dosyalarını ./models klasörüne koymanız gerekir.
+    // (models klasörünü GitHub'a ekleyebilir veya GitHub Pages kullanırken relative path ile çalıştırabilirsiniz.)
 
-startBtn.addEventListener("click", async () => {
-  startBtn.style.display = "none";
-  msg.textContent = "Kamera açılıyor...";
+    const video = document.getElementById('webcam');
+    const overlay = document.getElementById('overlay');
+    const overlayCtx = overlay.getContext('2d');
+    const startBtn = document.getElementById('startBtn');
+    const statusEl = document.getElementById('status');
 
-  try {
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: "user" },
-      audio: false
-    });
-    video.srcObject = stream;
-    msg.textContent = "Kamera açık";
-  } catch (err) {
-    msg.textContent = "Kamera açılamadı: " + err.message;
-    console.error(err);
-    return;
-  }
+    const images = {
+      happy: document.getElementById('img-happy'),
+      shocked: document.getElementById('img-shocked'),
+      surprised: document.getElementById('img-surprised'),
+      thinking: document.getElementById('img-thinking')
+    };
 
-  const MODEL_URL = "./models";
+    let detecting = false;
 
-  msg.textContent = "Model yükleniyor...";
-  await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
-  await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
-  await faceapi.nets.faceExpressionNet.loadFromUri(MODEL_URL);
-  msg.textContent = "Hazır";
-
-  const MEMES = {
-    happy: "meme-happy.png",
-    surprised: "meme-surprised.png",
-    fearful: "meme-shocked.png",
-    sad: "meme-thinking.png",
-    neutral: "meme-thinking.png",
-    angry: "meme-thinking.png",
-    disgusted: "meme-thinking.png"
-  };
-
-  video.addEventListener("playing", () => {
-    setInterval(async () => {
-      const res = await faceapi
-        .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions())
-        .withFaceLandmarks()
-        .withFaceExpressions();
-
-      if (!res) return;
-
-      const exp = res.expressions;
-      let best = "";
-      let bestVal = 0;
-
-      Object.keys(exp).forEach(k => {
-        if (exp[k] > bestVal) {
-          bestVal = exp[k];
-          best = k;
-        }
-      });
-
-      if (MEMES[best]) {
-        memeImg.src = MEMES[best];
+    function showImage(key){
+      // tümünü gizle
+      Object.values(images).forEach(img => img.classList.remove('show'));
+      const target = images[key];
+      if(target){
+        target.classList.add('show');
       }
-    }, 350);
-  });
-});
-</script>
+    }
 
+    async function initModels(){
+      statusEl.textContent = 'Durum: Modeller yükleniyor...';
+      // models klasörünüzde aşağıdaki dosyalar olmalı: tiny_face_detector_model-weights_manifest.json, face_expression_model-weights_manifest.json vb.
+      // Bu modelleri face-api.js github reposundan indirebilirsiniz ve ./models içine koyabilirsiniz.
+      await faceapi.nets.tinyFaceDetector.loadFromUri('./models');
+      await faceapi.nets.faceExpressionNet.loadFromUri('./models');
+      statusEl.textContent = 'Durum: Modeller yüklendi.';
+    }
+
+    async function startCamera(){
+      try{
+        const stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:'user'}, audio:false});
+        video.srcObject = stream;
+        await video.play();
+        overlay.width = video.videoWidth;
+        overlay.height = video.videoHeight;
+        overlay.style.width = video.offsetWidth + 'px';
+        overlay.style.height = video.offsetHeight + 'px';
+        statusEl.textContent = 'Durum: Kamera çalışıyor — İfade algılanıyor...';
+        detecting = true;
+        detectLoop();
+      }catch(err){
+        console.error(err);
+        statusEl.textContent = 'Hata: Kameraya erişilemedi. İzinleri kontrol edin.';
+      }
+    }
+
+    function mapExpressionToImage(expr){
+      // face-api expressions: neutral, happy, sad, angry, fearful, disgusted, surprised
+      // Basit eşleme:
+      if(!expr) return 'thinking';
+      // en yüksek expression anahtarını al
+      let best = {name:'neutral', value:0};
+      for(const k in expr){
+        if(expr[k] > best.value){ best = {name:k, value:expr[k]}; }
+      }
+      const name = best.name;
+      // Eşleme kurgusu
+      if(name === 'happy') return 'happy';
+      if(name === 'surprised') return 'surprised';
+      if(name === 'fearful') return 'shocked';
+      if(name === 'angry' || name === 'sad' || name === 'disgusted') return 'shocked';
+      if(name === 'neutral') return 'thinking';
+      return 'thinking';
+    }
+
+    async function detectLoop(){
+      const options = new faceapi.TinyFaceDetectorOptions({inputSize:224, scoreThreshold:0.5});
+      while(detecting){
+        if(video.readyState < 2){
+          await new Promise(r=>setTimeout(r,100));
+          continue;
+        }
+        const result = await faceapi.detectSingleFace(video, options).withFaceExpressions();
+        overlayCtx.clearRect(0,0,overlay.width,overlay.height);
+        if(result){
+          // kutu ve ifadeyi çiz
+          const resized = faceapi.resizeResults(result, {width:overlay.width, height:overlay.height});
+          const box = resized.detection.box;
+          overlayCtx.strokeStyle = '#00ff99';
+          overlayCtx.lineWidth = 2;
+          overlayCtx.strokeRect(box.x, box.y, box.width, box.height);
+
+          const expr = resized.expressions;
+          const mapped = mapExpressionToImage(expr);
+          showImage(mapped);
+          statusEl.textContent = `Durum: ${mapped} (ifadeye göre seçildi)`;
+        } else {
+          // algılanmamışsa thinking (düşünen) göster
+          showImage('thinking');
+          statusEl.textContent = 'Durum: Yüz algılanamadı';
+        }
+        await new Promise(r=>setTimeout(r,200)); // 200ms ara
+      }
+    }
+
+    // Başlat butonu
+    startBtn.addEventListener('click', async ()=>{
+      startBtn.disabled = true;
+      try{
+        await initModels();
+        await startCamera();
+      }catch(e){
+        console.error(e);
+        statusEl.textContent = 'Hata: Modeller yüklenirken veya kamera başlatılırken hata oluştu. Konsolu kontrol edin.';
+        startBtn.disabled = false;
+      }
+    });
+
+    // Sayfa kapanırken kamerayı durdur
+    window.addEventListener('beforeunload', ()=>{
+      detecting = false;
+      const s = video.srcObject;
+      if(s){
+        s.getTracks().forEach(t=>t.stop());
+      }
+    });
+  </script>
+
+  <!-- Kullanım notları:
+       1) Proje köküne (aynı klasöre) aşağıdaki resimleri koyun: meme-happy.png, meme-shocked.png, meme-surprised.png, meme-thinking.png
+       2) face-api.js modellerini ./models klasörüne indirin (face-api.js repo'sundan tiny face detector ve face expression modelleri).
+       3) Chrome'da local olarak çalıştırmak için dosyayı doğrudan açmak yerine basit bir HTTP sunucu kullanın (ör. VSCode Live Server veya `python -m http.server`).
+       4) GitHub Pages üzerinde barındırmak isterseniz, tüm dosyaları (html + images + models) repo'ya koyup Pages'ı etkinleştirin.
+  -->
 </body>
 </html>
-
-
