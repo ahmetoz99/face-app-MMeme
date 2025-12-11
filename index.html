@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>Face Meme Demo - Mobile</title>
+
+  <!-- face-api.js CDN -->
+  <script defer src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+
+  <style>
+    :root{--gap:6px}
+    html,body{height:100%;margin:0;background:#000;color:#fff;font-family:Arial,Helvetica,sans-serif}
+    .wrap{display:flex;flex-direction:column;height:100vh;gap:var(--gap);padding:0;box-sizing:border-box}
+    /* üst video, alt meme */
+    .half{flex:1;position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center}
+    video#video{
+      width:100%;
+      height:100%;
+      object-fit:cover;
+      transform: scaleX(-1); /* mirror for natural selfie view */
+    }
+    #memeArea{
+      background:#111;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:8px;
+    }
+    #memeArea img{
+      max-width:100%;
+      max-height:100%;
+      object-fit:contain;
+      border-radius:8px;
+      box-shadow:0 6px 18px rgba(0,0,0,0.6);
+    }
+
+    /* küçük üst bilgi butonu */
+    #info{position:absolute;left:6px;top:6px;background:rgba(0,0,0,0.4);padding:6px 8px;border-radius:6px;font-size:12px}
+    /* Responsive tweaks */
+    @media (min-width:700px){
+      .wrap{flex-direction:row}
+      video#video{width:50%}
+      #memeArea{width:50%}
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="half" id="cameraArea">
+      <div id="info">Kamera: Açık — Mimik algılanınca alt bölge dolacak</div>
+      <video id="video" autoplay muted playsinline></video>
+    </div>
+
+    <div class="half" id="memeArea">
+      <!-- Başlangıçta boş olur -->
+      <img id="memeImg" src="" alt="Meme" />
+    </div>
+  </div>
+
+<script>
+(async () => {
+  // MODELLERİ YÜKLE (CDN'den)
+  const MODEL_URL = "https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js/models";
+  await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
+  await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
+  await faceapi.nets.faceExpressionNet.loadFromUri(MODEL_URL);
+
+  const video = document.getElementById('video');
+  const memeImg = document.getElementById('memeImg');
+
+  // Kullanıcıdan kamera izni (mobil için playsinline, muted)
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: false,
+      video: { facingMode: "user" }
+    });
+    video.srcObject = stream;
+  } catch (e) {
+    alert('Kameraya erişim izni yok veya cihaz desteklemiyor: ' + e.message);
+    return;
+  }
+
+  // Hangi ifadeye hangi meme gösterilecek?
+  const MEME_MAP = {
+    happy: 'meme-happy.png',
+    surprised: 'meme-surprised.png',
+    fearful: 'meme-shocked.png', // shock / open mouth fallback
+    neutral: 'meme-thinking.png',
+    sad: 'meme-thinking.png',
+    angry: 'meme-thinking.png',
+    disgusted: 'meme-thinking.png'
+  };
+
+  // Eşik değerleri - bu değerlere göre tespit edilir
+  const THRESHOLDS = {
+    happy: 0.65,
+    surprised: 0.65,
+    fearful: 0.6,
+    neutral: 0.6,
+    sad: 0.6,
+    angry: 0.6,
+    disgusted: 0.7
+  };
+
+  // Son gösterilen meme (boş ise "")
+  let currentMeme = "";
+
+  // Video oynatmaya başladıktan sonra interval ile tespit
+  video.addEventListener('playing', () => {
+    const interval = setInterval(async () => {
+      if (video.readyState < 2) return;
+
+      const detection = await faceapi.detectSingleFace(video, new faceapi.TinyFaceDetectorOptions())
+        .withFaceLandmarks()
+        .withFaceExpressions();
+
+      if (!detection || !detection.expressions) {
+        // yüz yoksa hiçbir şey yapma (meme kalmaya devam eder)
+        return;
+      }
+
+      const exp = detection.expressions;
+      // expressions objesinde en yüksek olana göre karar verebiliriz
+      // Ama öncelikle önceden tanımlı eşiği sağlayan ifade var mı kontrol et
+      let chosen = null;
+      let bestScore = 0;
+
+      for (const key of Object.keys(MEME_MAP)) {
+        const score = exp[key] ?? 0;
+        const thresh = THRESHOLDS[key] ?? 0.7;
+        if (score > thresh && score > bestScore) {
+          bestScore = score;
+          chosen = key;
+        }
+      }
+
+      if (chosen) {
+        const newMeme = MEME_MAP[chosen];
+        if (newMeme !== currentMeme) {
+          // meme değişecek -> güncelle ve kalıcı bırak
+          memeImg.src = newMeme;
+          currentMeme = newMeme;
+        }
+      }
+      // Eğer hiçbir ifade eşiği geçmiyorsa, mevcut meme kalmaya devam eder
+    }, 200); // 200ms
+  });
+
+  // iOS Safari için dokununca kamera izin açma (bazı cihazlarda autoplay engeli)
+  document.body.addEventListener('click', () => {
+    if (video.paused) video.play().catch(()=>{});
+  });
+
+})();
+</script>
+</body>
+</html>
