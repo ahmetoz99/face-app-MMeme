@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Face Meme iOS Fix</title>
+  <title>Face Meme iOS</title>
 
   <script defer src="https://cdn.jsdelivr.net/npm/face-api.js"></script>
 
@@ -29,76 +29,77 @@
       width:100%;
       height:100%;
       object-fit:cover;
-      transform:scaleX(-1); /* selfie */
-      background:#111;
-    }
-    #memeArea {
+      transform:scaleX(-1);
       background:#111;
     }
     #memeImg {
       max-width:100%;
       max-height:100%;
     }
+    #startBtn {
+      position:absolute;
+      top:50%; left:50%;
+      transform:translate(-50%, -50%);
+      padding:16px 28px;
+      background:#fff;
+      color:#000;
+      font-size:18px;
+      border-radius:12px;
+      z-index:999;
+    }
     #msg {
       position:absolute;
       top:10px;
       left:10px;
       color:#fff;
-      font-size:14px;
-      background:rgba(0,0,0,0.5);
-      padding:4px 8px;
-      border-radius:6px;
     }
   </style>
 </head>
 
 <body>
+
+<button id="startBtn">Kamerayı Başlat</button>
+
 <div class="wrap">
   <div id="videoArea">
     <video id="video" autoplay muted playsinline></video>
-    <div id="msg">Kamera yükleniyor...</div>
+    <div id="msg"></div>
   </div>
   <div id="memeArea">
-    <img id="memeImg" src="" />
+    <img id="memeImg" src="">
   </div>
 </div>
 
 <script>
-(async () => {
-  const video = document.getElementById("video");
-  const memeImg = document.getElementById("memeImg");
-  const msg = document.getElementById("msg");
+const startBtn = document.getElementById("startBtn");
+const video = document.getElementById("video");
+const memeImg = document.getElementById("memeImg");
+const msg = document.getElementById("msg");
 
-  // iOS için garanti dokunma tetikleyici
-  document.body.addEventListener("touchstart", () => {
-    if (video.paused) video.play().catch(()=>{});
-  });
+startBtn.addEventListener("click", async () => {
+  startBtn.style.display = "none";
+  msg.textContent = "Kamera açılıyor...";
 
-  // Kamera başlat
-  async function startCamera() {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "user" },
-        audio: false
-      });
-      video.srcObject = stream;
-      msg.textContent = "Kamera açık";
-    } catch (err) {
-      msg.textContent = "Kamera açılamadı: " + err.message;
-      console.error(err);
-    }
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: "user" },
+      audio: false
+    });
+    video.srcObject = stream;
+    msg.textContent = "Kamera açık";
+  } catch (err) {
+    msg.textContent = "Kamera açılamadı: " + err.message;
+    console.error(err);
+    return;
   }
 
-  await startCamera();
-
-  // MODELLER
   const MODEL_URL = "https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js/models";
 
+  msg.textContent = "Model yükleniyor...";
   await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
   await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
   await faceapi.nets.faceExpressionNet.loadFromUri(MODEL_URL);
-
-  msg.textContent = "Mimik tespiti hazır";
+  msg.textContent = "Hazır";
 
   const MEMES = {
     happy: "meme-happy.png",
@@ -110,37 +111,32 @@
     disgusted: "meme-thinking.png"
   };
 
-  let current = "";
-
   video.addEventListener("playing", () => {
     setInterval(async () => {
-      const result = await faceapi
+      const res = await faceapi
         .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions())
         .withFaceLandmarks()
         .withFaceExpressions();
 
-      if (!result) return;
+      if (!res) return;
 
-      const exp = result.expressions;
-
+      const exp = res.expressions;
       let best = "";
-      let bestValue = 0;
+      let bestVal = 0;
 
       Object.keys(exp).forEach(k => {
-        if (exp[k] > bestValue) {
-          bestValue = exp[k];
+        if (exp[k] > bestVal) {
+          bestVal = exp[k];
           best = k;
         }
       });
 
-      if (MEMES[best] && MEMES[best] !== current) {
-        current = MEMES[best];
-        memeImg.src = current;
+      if (MEMES[best]) {
+        memeImg.src = MEMES[best];
       }
-    }, 250);
+    }, 350);
   });
-
-})();
+});
 </script>
 
 </body>
