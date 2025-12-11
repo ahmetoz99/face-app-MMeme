@@ -147,24 +147,22 @@ function showImage(key){
       }
     }
 
-    function mapExpressionToImage(expr){
-      // face-api expressions: neutral, happy, sad, angry, fearful, disgusted, surprised
-      // Basit eşleme:
-      if(!expr) return 'thinking';
-      // en yüksek expression anahtarını al
-      let best = {name:'neutral', value:0};
-      for(const k in expr){
+   function mapExpressionToImage(expr){
+    let best = {name:'neutral', value:0};
+    for(const k in expr){
         if(expr[k] > best.value){ best = {name:k, value:expr[k]}; }
-      }
-      const name = best.name;
-      // Eşleme kurgusu
-      if(name === 'happy') return 'happy';
-      if(name === 'surprised') return 'surprised';
-      if(name === 'fearful') return 'shocked';
-      if(name === 'angry' || name === 'sad' || name === 'disgusted') return 'shocked';
-      if(name === 'neutral') return 'thinking';
-      return 'thinking';
     }
+    switch(best.name){
+        case 'happy': return 'happy';
+        case 'sad': return 'sad';
+        case 'angry': return 'angry';
+        case 'fearful': return 'fearful';
+        case 'surprised': return 'surprised';
+        case 'neutral': return 'thinking';
+        default: return 'thinking';
+    }
+}
+
 
     async function detectLoop(){
       const options = new faceapi.TinyFaceDetectorOptions({inputSize:224, scoreThreshold:0.5});
@@ -228,6 +226,7 @@ statusEl.textContent = `Durum: ${mapped} (ifadeye göre seçildi)`;
   -->
 </body>
 </html>
+
 
 
 
