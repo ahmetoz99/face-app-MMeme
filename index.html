@@ -89,11 +89,14 @@
     const statusEl = document.getElementById('status');
 
     const images = {
-      happy: document.getElementById('img-happy'),
-      shocked: document.getElementById('img-shocked'),
-      surprised: document.getElementById('img-surprised'),
-      thinking: document.getElementById('img-thinking')
-    };
+    happy: document.getElementById('img-happy'),
+    sad: document.getElementById('img-sad'),
+    angry: document.getElementById('img-angry'),
+    fearful: document.getElementById('img-fearful'),
+    surprised: document.getElementById('img-surprised'),
+    thinking: document.getElementById('img-thinking')
+};
+
 
     let detecting = false;
 
@@ -230,6 +233,7 @@ statusEl.textContent = `Durum: ${mapped} (ifadeye göre seçildi)`;
   -->
 </body>
 </html>
+
 
 
 
