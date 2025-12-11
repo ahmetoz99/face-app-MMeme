@@ -14,9 +14,31 @@
     video#webcam{max-width:100%;height:100%;object-fit:cover;transform:scaleX(-1)}
     canvas#overlay{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none}
 
-    .photo-box{position:relative;width:80%;max-width:720px;height:80%;display:flex;align-items:center;justify-content:center}
-    .photo-box img{max-width:100%;max-height:100%;opacity:0;transition:opacity 300ms ease,transform 300ms ease;transform:scale(0.98)}
-    .photo-box img.show{opacity:1;transform:scale(1)}
+   .photo-box{
+    position:relative;
+    width:90%;
+    max-width:400px;
+    height:90%;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    overflow:hidden;
+}
+.photo-box img{
+    position:absolute;
+    top:50%;
+    left:50%;
+    transform:translate(-50%, -50%) scale(0.95);
+    max-width:100%;
+    max-height:100%;
+    opacity:0;
+    transition:opacity 300ms ease, transform 300ms ease;
+}
+.photo-box img.show{
+    opacity:1;
+    transform:translate(-50%, -50%) scale(1);
+}
+
 
     .controls{position:absolute;left:12px;top:12px;background:rgba(0,0,0,0.35);padding:10px;border-radius:10px;backdrop-filter:blur(4px)}
     .controls button{background:#1f2937;color:#fff;border:0;padding:8px 10px;border-radius:8px;cursor:pointer}
@@ -71,14 +93,32 @@
 
     let detecting = false;
 
-    function showImage(key){
-      // tümünü gizle
-      Object.values(images).forEach(img => img.classList.remove('show'));
-      const target = images[key];
-      if(target){
-        target.classList.add('show');
-      }
+   let lastShown = null;
+let lastExpr = null;
+const minShowTime = 2000; // 2000ms = 2 saniye
+
+function showImageWithDelay(key){
+    const now = Date.now();
+    if(lastExpr !== key){
+        // yeni ifade gelmiş
+        lastExpr = key;
+        lastShown = now;
+        showImage(key);
+    } else if(now - lastShown > minShowTime){
+        // aynı ifade en az minShowTime gösterildi, güncellenebilir
+        showImage(key);
     }
+}
+
+// eski showImage fonksiyonu hâlâ lazım (showImageWithDelay içinde çağrılıyor)
+function showImage(key){
+    Object.values(images).forEach(img => img.classList.remove('show'));
+    const target = images[key];
+    if(target){
+        target.classList.add('show');
+    }
+}
+
 
     async function initModels(){
       statusEl.textContent = 'Durum: Modeller yükleniyor...';
@@ -144,9 +184,10 @@
           overlayCtx.strokeRect(box.x, box.y, box.width, box.height);
 
           const expr = resized.expressions;
-          const mapped = mapExpressionToImage(expr);
-          showImage(mapped);
-          statusEl.textContent = `Durum: ${mapped} (ifadeye göre seçildi)`;
+         const mapped = mapExpressionToImage(expr);
+showImageWithDelay(mapped);
+statusEl.textContent = `Durum: ${mapped} (ifadeye göre seçildi)`;
+
         } else {
           // algılanmamışsa thinking (düşünen) göster
           showImage('thinking');
@@ -187,3 +228,4 @@
   -->
 </body>
 </html>
+
