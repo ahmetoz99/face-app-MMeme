@@ -93,7 +93,7 @@ startBtn.addEventListener("click", async () => {
     return;
   }
 
-  const MODEL_URL = "https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js/models";
+  const MODEL_URL = "./models";
 
   msg.textContent = "Model yükleniyor...";
   await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
@@ -141,3 +141,4 @@ startBtn.addEventListener("click", async () => {
 
 </body>
 </html>
+
